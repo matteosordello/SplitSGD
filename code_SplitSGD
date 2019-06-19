@@ -1,0 +1,96 @@
+library(pracma)
+
+SplitSGD <- function(x, y, model, t1, K, eta, l, w, q, C, nsave, gamma, theta0) {
+  n <- nrow(x)
+  d <- ncol(x)
+  stepsize = eta
+  diagnostic_truth = c()
+  all_stepsize = eta
+  diagnostic_stop = t1 + 2*l*w
+  
+  if (model == "lm") {
+    m = 1/gamma
+    getGradient <- function(t, x1, y1) { x1 * (dot(t, x1) - y1) }
+  } 
+  if (model == "log") {
+    m = 1/gamma
+    # getGradient <- function(t, x1, y1) { -y1 * x1 / (1 + exp(y1*dot(t, x1))) }           # if y = +1 or -1
+    getGradient <- function(t, x1, y1) { -y1*x1 + x1/(1 + exp(-dot(t, x1))) }              # if y = 0 or 1
+  }
+  if (model == 'svm'){
+    m = min(1/gamma, 2)
+    getGradient <- function(t, x1, y1) {
+      if(y1*dot(t, x1) >= 1){              
+        return(t)
+      }
+      if(y1*dot(t, x1) < 1){              
+        return(t - C*y1*x1)
+      }
+    }
+  }
+  
+  iter = 1
+  theta <- matrix(theta0, ncol = d, nrow = 1)
+  theta_temp = theta0
+  
+  for(k in 1:(K+1)){
+    for (i in 1:(t1-1)){
+      idx <- sample(n, 1)
+      theta_temp = theta_temp - stepsize*getGradient(theta_temp, x[idx, ], y[idx])
+      iter = iter + 1
+      if(iter > nsave*(dim(theta)[1])){
+        theta = rbind(theta, theta_temp)
+        all_stepsize = c(all_stepsize, stepsize)
+      }
+    }
+    
+    theta_temp1 = theta_temp
+    theta_temp2 = theta_temp
+    
+    Qi = c()
+    for(j in 1:w){
+      theta_in1 = theta_temp1
+      theta_in2 = theta_temp2
+      for(h in 1:l){
+        idx1 <- sample(n, 1)
+        idx2 <- sample(n, 1)
+        theta_temp1 = theta_temp1 - stepsize*getGradient(theta_temp1, x[idx1, ], y[idx1])
+        theta_temp2 = theta_temp2 - stepsize*getGradient(theta_temp2, x[idx2, ], y[idx2])
+        iter = iter + 2
+        if(iter > nsave*(dim(theta)[1])){
+          theta = rbind(theta, theta_temp1)
+          all_stepsize = c(all_stepsize, stepsize)
+        }
+      }
+      Qi = c(Qi, t(theta_temp1-theta_in1)%*%(theta_temp2-theta_in2))
+    }
+    
+    
+    
+    if (sum(Qi < 0) >= q){
+      diagnostic_truth = c(diagnostic_truth, TRUE)
+      t1 = as.integer(t1*m)
+      stepsize = stepsize*gamma
+    }
+    if (sum(Qi < 0) < q){
+      diagnostic_truth = c(diagnostic_truth, FALSE)
+    }
+    
+    if (k < K+1){
+      avg = (theta_temp1 + theta_temp2)/2
+      diagnostic_stop = c(diagnostic_stop, iter)
+      iter = iter + 1
+      theta_temp = avg
+      if(iter > nsave*(dim(theta)[1])){
+        theta = rbind(theta, theta_temp)
+        all_stepsize = c(all_stepsize, stepsize)
+      }
+    }
+  }
+  out <- list()
+  out$theta = theta
+  out$diagnostic_truth = diagnostic_truth
+  out$stepsize = all_stepsize
+  out$diagnostic_stop = diagnostic_stop
+  out
+}
