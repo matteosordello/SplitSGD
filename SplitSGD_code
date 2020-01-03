@@ -39,9 +39,9 @@ def SplitSGD(net, K, t1, q, w, gamma, lr, mom):
                 outputs = net(images)
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
-                correct += (predicted == labels).sum()
+                correct += (predicted == labels).sum().item()
 
-            accuracy = 100*correct.item()/total
+            accuracy = 100*correct/total
             accuracy_splitsgd.append(accuracy)
 
             print('epoch: %d, test accuracy: %.2f' % (real_epoch, accuracy))        
@@ -97,6 +97,8 @@ def SplitSGD(net, K, t1, q, w, gamma, lr, mom):
         stationarity = (sum([dot_prod[i] < 0 for i in range(len(dot_prod))]) >= q*len(dot_prod))
         if stationarity:
             lr = lr*gamma
+            # here you can also let the next single thread be longer by a factor gamma
+            # by adding -> t1 = int(t1/gamma)
 
         net = FeedforwardNeuralNetModel(input_dim, hidden_dim, output_dim)  
         beta = 0.5 
@@ -121,9 +123,9 @@ def SplitSGD(net, K, t1, q, w, gamma, lr, mom):
             outputs = net(images)
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
-            correct += (predicted == labels).sum()
+            correct += (predicted == labels).sum().item()
 
-        accuracy = 100*correct.item()/total
+        accuracy = 100*correct/total
         accuracy_splitsgd.append(accuracy)
 
         print('D -> epoch: %d, test accuracy: %.2f, stationarity: %s, negative dot products: %i out of %i, 
